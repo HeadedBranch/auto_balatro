@@ -18,8 +18,10 @@ use remotro::balatro::{
 fn get_scored_cards<'a>(
     selected: &mut Vec<&'a PlayingCard>,
     hand_type: &PokerHandKind,
+    shortcut: bool,
 ) -> Vec<&'a PlayingCard> {
     const FIVE_CARD_HANDS: [PokerHandKind; 4] = [FiveOfAKind, FlushFive, FlushHouse, FullHouse];
+    // Hands that always require 5 cards to exist
     let mut scored: Vec<&'a PlayingCard> = Vec::new();
     if FIVE_CARD_HANDS.contains(hand_type) {
         return selected.to_vec();
@@ -27,7 +29,6 @@ fn get_scored_cards<'a>(
     for card in &mut *selected {
         if card.enhancement == Some(Stone) {
             scored.push(card);
-            continue;
         }
     }
     selected.sort_unstable_by_key(|a| a.rank);
@@ -48,7 +49,6 @@ fn get_scored_cards<'a>(
                 .windows(count)
                 .position(|w| w.iter().all(|c| c.rank == w[0].rank))
             {
-                println!("{:?}", &selected[i..i + count]);
                 scored.extend_from_slice(&selected[i..i + count]);
             }
         }
@@ -70,17 +70,21 @@ fn get_scored_cards<'a>(
         Straight => {
             if selected.windows(2).all(|w| w[1].rank == w[0].rank.next()) {
                 scored.extend_from_slice(selected);
-            }
-            if let Some(i) = selected
+            } else if let Some(i) = selected
                 .windows(4)
-                .position(|w| w.windows(2).all(|w| w[1].rank == w[0].rank.next()))
-            {
-                scored.extend_from_slice(&selected[i..i + 4]); // TODO Add support for shortcut
+                .position(|w| w.windows(2).all(|w| w[1].rank == w[0].rank.next())) {
+                scored.extend_from_slice(&selected[i..i + 4]);
+            } else if shortcut
+                && let Some(i) = selected
+                    .windows(4)
+                    .position(|w| w.windows(2).all(|w| w[1].rank <= w[0].rank.next().next())) {
+                scored.extend_from_slice(&selected[i..i + 4]);
             }
         }
-        Flush => {
+        Flush => 'block: {
             if selected.iter().all(|c| c.suit == selected[0].suit) {
                 scored.extend_from_slice(selected);
+                break 'block;
             }
             selected.sort_unstable_by_key(|a| a.suit);
             if let Some(i) = selected
@@ -90,12 +94,15 @@ fn get_scored_cards<'a>(
                 scored.extend_from_slice(&selected[i..i + 4]);
             }
         }
-        _ => {} // TODO Add support for StraightFlush
+        StraightFlush => {
+            todo!();
+        }
+        _ => unreachable!(),
     }
     scored
 }
 
-pub fn score_hand(play: Play) -> f64 {
+pub fn score_hand(play: &Play) -> f64 {
     let mut selected: Vec<&PlayingCard> = Vec::new();
     let mut hand: Vec<&PlayingCard> = Vec::new();
     for card in play.hand() {
@@ -118,7 +125,11 @@ pub fn score_hand(play: Play) -> f64 {
     let scored = if play.jokers().iter().any(|joker| joker.kind == Splash) {
         selected.into_iter().collect()
     } else {
-        get_scored_cards(&mut selected, &play.poker_hand().unwrap().kind)
+        get_scored_cards(
+            &mut selected,
+            &play.poker_hand().unwrap().kind,
+            play.jokers().iter().any(|j| j.kind == FourFingers),
+        )
     };
     for card in scored {
         if let Some(e) = card.enhancement {

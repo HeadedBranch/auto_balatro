@@ -27,12 +27,17 @@ async fn main() {
                     CurrentScreen::SelectBlind(_blinds) => {
                         println!("BlindSelect");
                     }
-                    CurrentScreen::Play(play) => {
+                    CurrentScreen::Play(/*mut*/ play) => {
                         println!("Playing");
-                        println!("{}", play::score_hand(play));
+                        //play = play.click(&[0]).await.expect("Something Failed");
+                        println!("{}", play::score_hand(&play));
+                        //let _ = play.play().await;
                     }
                     CurrentScreen::Shop(_shop) => {
                         println!("Shop");
+                    }
+                    CurrentScreen::GameOver(_game) => {
+                        println!("Game Over");
                     }
                     _ => {}
                 },
