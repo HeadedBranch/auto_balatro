@@ -31,7 +31,7 @@ fn get_scored_cards<'a>(
             scored.push(card);
         }
     }
-    selected.sort_unstable_by_key(|a| a.rank);
+    selected.sort_unstable_by_key(|c| c.rank);
     match hand_type {
         HighCard => {
             if let Some(card) = selected.last() {
@@ -69,16 +69,24 @@ fn get_scored_cards<'a>(
         }
         Straight => {
             if selected.windows(2).all(|w| w[1].rank == w[0].rank.next()) {
-                scored.extend_from_slice(selected);
+                scored.extend_from_slice(selected); // 5 card Straight
+            } else if shortcut
+                && selected
+                    .windows(2)
+                    .all(|w| w[1].rank == w[0].rank.next().next())
+            {
+                scored.extend_from_slice(selected); // 5 card Straight with shortcut
             } else if let Some(i) = selected
                 .windows(4)
-                .position(|w| w.windows(2).all(|w| w[1].rank == w[0].rank.next())) {
-                scored.extend_from_slice(&selected[i..i + 4]);
+                .position(|w| w.windows(2).all(|w| w[1].rank == w[0].rank.next()))
+            {
+                scored.extend_from_slice(&selected[i..i + 4]); // 4 card straight (Four Fingers)
             } else if shortcut
                 && let Some(i) = selected
                     .windows(4)
-                    .position(|w| w.windows(2).all(|w| w[1].rank <= w[0].rank.next().next())) {
-                scored.extend_from_slice(&selected[i..i + 4]);
+                    .position(|w| w.windows(2).all(|w| w[1].rank <= w[0].rank.next().next()))
+            {
+                scored.extend_from_slice(&selected[i..i + 4]); // 4 card straight with shortcut
             }
         }
         Flush => 'block: {
@@ -94,8 +102,14 @@ fn get_scored_cards<'a>(
                 scored.extend_from_slice(&selected[i..i + 4]);
             }
         }
-        StraightFlush => {
-            todo!();
+        StraightFlush => 'block: {
+            if selected.windows(2).all(|w| w[1].rank <= w[0].rank.next())
+                && selected.iter().all(|c| c.suit == selected[0].suit)
+            {
+                scored.extend_from_slice(selected);
+                break 'block;
+            }
+            selected.sort_by_key(|c| c.suit);
         }
         _ => unreachable!(),
     }
