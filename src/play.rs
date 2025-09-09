@@ -1,3 +1,4 @@
+use remotro::balatro::deck::Suit::{Clubs, Spades};
 use remotro::balatro::{
     deck::{
         CardEdition::*,
@@ -19,6 +20,7 @@ fn get_scored_cards<'a>(
     selected: &mut Vec<&'a PlayingCard>,
     hand_type: &PokerHandKind,
     shortcut: bool,
+    // TODO: Add support for smeared joker
 ) -> Vec<&'a PlayingCard> {
     const FIVE_CARD_HANDS: [PokerHandKind; 4] = [FiveOfAKind, FlushFive, FlushHouse, FullHouse];
     // Hands that always require 5 cards to exist
@@ -169,11 +171,47 @@ pub fn score_hand(play: &Play) -> f64 {
         if card.enhancement == Some(Steel) {
             mult *= 1.5
         }
+        //RaisedFist => mult += get_chips_from_rank(play.hand().iter().filter(|c| !c.selected).min_by_key(|c| c.card.as_ref().unwrap().rank).unwrap().card.as_ref().unwrap().rank),
     }
     for joker in play.jokers() {
         match joker.kind {
             Joker => mult += 4.0,
-
+            Jolly => { if play.poker_hand().unwrap().kind == Pair { mult += 8.0; } }
+            Zany => { if play.poker_hand().unwrap().kind == ThreeOfAKind { mult += 12.0; } }
+            Mad => { if play.poker_hand().unwrap().kind == TwoPair { mult += 10.0; } }
+            Crazy => { if play.poker_hand().unwrap().kind == Straight { mult += 12.0; } }
+            Droll => { if play.poker_hand().unwrap().kind == Flush { mult += 10.0; } }
+            Sly => { if play.poker_hand().unwrap().kind == Pair { chips += 50.0; } }
+            Wily => { if play.poker_hand().unwrap().kind == ThreeOfAKind { chips += 100.0; } }
+            Clever => { if play.poker_hand().unwrap().kind == TwoPair { chips += 80.0; } }
+            Devious => { if play.poker_hand().unwrap().kind == Straight { chips += 100.0; } }
+            Crafty => { if play.poker_hand().unwrap().kind == Flush { chips += 80.0; } }
+            Half => { if play.hand().iter().filter(|c| c.selected).count() <= 3 { mult += 20.0 } }
+            Stencil {xmult} => mult *= xmult as f64,
+            Ceremonial {mult: jmult} => mult += jmult as f64,
+            Banner => chips += 30.0*play.discards() as f64,
+            MysticSummit => { if play.discards() == 0 { mult += 15.0 } }
+            LoyaltyCard {left} => { if left == 0 { mult *= 4.0 } }
+            Misprint => mult += 23.0,
+            SteelJoker {xmult} => mult *= xmult,
+            Abstract {mult:jmult} => mult += jmult as f64,
+            GrosMichel => mult += 15.0,
+            Supernova => mult += play.run_info().poker_hands.high_card.played as f64,
+            Blackboard => { if play.hand().iter().filter(|c| !c.selected).all(|c| c.card.as_ref().unwrap().suit == Spades || c.card.as_ref().unwrap().suit == Clubs) { mult *= 3.0 } }
+            Runner {chips: jchips} => chips += jchips as f64,
+            IceCream {chips: jchips} => chips += jchips as f64,
+            BlueJoker {chips: jchips} => chips += jchips as f64,
+            Constellation {xmult} => mult *= xmult,
+            GreenJoker {mult: jmult} => mult += jmult as f64,
+            TodoList {poker_hand} => { if poker_hand == play.poker_hand().unwrap().kind { todo!("Implement money gain")}}
+            Cavendish => mult *= 3.0,
+            CardSharp => todo!(),
+            RedCard {mult:jmult} => mult += jmult as f64,
+            Square {chips: jchips} => chips += jchips as f64,
+            Madness {xmult} => mult *= xmult,
+            Vampire {xmult} => mult *= xmult,
+            Hologram {xmult} => mult *= xmult,
+            Obelisk {xmult} => mult *= xmult,
             _ => {}
         }
     }
