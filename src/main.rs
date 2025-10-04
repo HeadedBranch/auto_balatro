@@ -1,4 +1,6 @@
+use remotro::balatro::menu::{Deck, Stake};
 use remotro::{Remotro, balatro::CurrentScreen};
+
 mod play;
 
 #[tokio::main]
@@ -21,8 +23,9 @@ async fn main() {
         loop {
             match balatro.screen().await {
                 Ok(screen) => match screen {
-                    CurrentScreen::Menu(_menu) => {
-                        println!("Menu");
+                    CurrentScreen::Menu(menu) => {
+                        println!("{}", menu.saved_run().unwrap());
+                        let _ = menu.new_run(Deck::Red, Stake::White, None).await;
                     }
                     CurrentScreen::SelectBlind(_blinds) => {
                         println!("BlindSelect");
