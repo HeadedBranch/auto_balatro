@@ -1,3 +1,4 @@
+use remotro::balatro::deck::Enhancement;
 use remotro::balatro::{
     deck::{
         CardEdition::*,
@@ -7,8 +8,8 @@ use remotro::balatro::{
         Seal::*,
         Suit::*,
     },
-    hud::Hud,
     jokers::JokerKind::{self, *},
+    hud::Hud,
     menu::Deck::Plasma,
     play::{
         Play,
@@ -111,7 +112,7 @@ fn get_scored_cards<'a>(
                 scored.extend_from_slice(selected);
                 break 'block;
             }
-            selected.sort_by_key(|c| c.suit);
+            selected.sort_by_key(|c| c.suit); // TODO; need to be able to detect
         }
         _ => unreachable!(),
     }
@@ -165,13 +166,141 @@ pub fn score_hand(play: &Play) -> f64 {
                 Polychrome => mult *= 1.5,
             }
         }
+        for joker in play.jokers() {
+            match joker.kind {
+                GreedyJoker => {
+                    if card.suit == Diamonds {
+                        mult += 3.0
+                    }
+                }
+                LustyJoker => {
+                    if card.suit == Hearts {
+                        mult += 3.0
+                    }
+                }
+                WrathfulJoker => {
+                    if card.suit == Spades {
+                        mult += 3.0
+                    }
+                }
+                GluttenousJoker => {
+                    if card.suit == Clubs {
+                        mult += 3.0
+                    }
+                }
+                EightBall { .. } => todo!(),
+                Dusk => {
+                    if play.hands() == 1 {
+                        todo!()
+                    }
+                }
+                Fibonacci => match card.rank {
+                    Ace | Two | Three | Five | Eight => mult += 8.0,
+                    _ => {}
+                },
+                ScaryFace => match card.rank {
+                    Jack | Queen | King => chips += 30.0,
+                    _ => {}
+                },
+                Hack => todo!(),
+                EvenSteven => match card.rank {
+                    Two | Four | Six | Eight | Ten => mult += 4.0,
+                    _ => {}
+                },
+                OddTodd => match card.rank {
+                    Ace | Two | Three | Five | Seven | Nine => chips += 31.0,
+                    _ => {}
+                },
+                Scholar => {
+                    if card.rank == Ace {
+                        mult += 4.0;
+                        chips += 20.0
+                    }
+                }
+                Business { .. } => match card.rank {
+                    Jack | Queen | King => todo!(),
+                    _ => {}
+                },
+                Ancient { suit } => {
+                    if card.suit == suit {
+                        mult *= 1.5;
+                    }
+                }
+                WalkieTalkie => match card.rank {
+                    Four | Ten => {
+                        chips += 10.0;
+                        mult += 4.0
+                    }
+                    _ => {}
+                },
+                Smiley => match card.rank {
+                    Jack | Queen | King => mult += 5.0,
+                    _ => {}
+                },
+                Ticket => {
+                    if card.enhancement == Some(Enhancement::Gold) {
+                        todo!()
+                    }
+                }
+                RoughGem => {
+                    if card.suit == Diamonds {
+                        todo!()
+                    }
+                }
+                Bloodstone { .. } => {
+                    if card.suit == Hearts {
+                        mult *= 1.5;
+                    }
+                }
+                Arrowhead => {
+                    if card.suit == Spades {
+                        chips += 50.0
+                    }
+                }
+                OnyxAgate => {
+                    if card.suit == Clubs {
+                        mult += 7.0
+                    }
+                }
+                Idol { rank, suit } => {
+                    if card.rank == rank && card.suit == suit {
+                        mult *= 2.0
+                    }
+                }
+                Triboulet => match card.rank {
+                    Queen | King => mult *= 2.0,
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
         chips += get_chips_from_rank(card.rank);
     }
-    for card in hand {
+    for card in &hand {
         if card.enhancement == Some(Steel) {
             mult *= 1.5
         }
-        //RaisedFist => mult += get_chips_from_rank(play.hand().iter().filter(|c| !c.selected).min_by_key(|c| c.card.as_ref().unwrap().rank).unwrap().card.as_ref().unwrap().rank),
+        for joker in play.jokers() {
+            match joker.kind{
+                Baron => {
+                    if card.rank == King {
+                        mult *= 1.5
+                    }
+                }
+                ReservedParking {..} => {
+                    match card.rank {
+                        Jack | Queen | King => todo!(),
+                        _ => {}
+                    }
+                }
+                RaisedFist => {
+                    if card.rank == hand.iter().min_by_key(|c|c.rank).unwrap().rank {
+                        mult += get_chips_from_rank(card.rank);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
     for joker in play.jokers() {
         match joker.kind {
@@ -247,7 +376,7 @@ pub fn score_hand(play: &Play) -> f64 {
             Misprint => mult += 23.0,
             SteelJoker { xmult } => mult *= xmult,
             Abstract { mult: jmult } => mult += jmult as f64,
-            GrosMichel => mult += 15.0,
+            GrosMichel { .. } => mult += 15.0,
             Supernova => mult += play.run_info().poker_hands.high_card.played as f64, // TODO: Add proper handling of supernova
             Blackboard => {
                 if play.hand().iter().filter(|c| !c.selected).all(|c| {
@@ -267,7 +396,7 @@ pub fn score_hand(play: &Play) -> f64 {
                     todo!("Implement money gain")
                 }
             }
-            Cavendish => mult *= 3.0,
+            Cavendish {..} => mult *= 3.0,
             CardSharp => todo!(),
             RedCard { mult: jmult } => mult += jmult as f64,
             Square { chips: jchips } => chips += jchips as f64,
