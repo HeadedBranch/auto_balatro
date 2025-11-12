@@ -8,8 +8,11 @@ use remotro::balatro::{
         Seal::*,
         Suit::*,
     },
-    jokers::JokerKind::{self, *},
     hud::Hud,
+    jokers::{
+        JokerEdition,
+        JokerKind::{self, *},
+    },
     menu::Deck::Plasma,
     play::{
         Play,
@@ -137,6 +140,7 @@ pub fn score_hand(play: &Play) -> f64 {
     if selected.is_empty() {
         return 0.0;
     }
+    let mut vamp_mult = 0.0;
     let mut chips = play.poker_hand().unwrap().chips as f64;
     let mut mult = play.poker_hand().unwrap().mult as f64;
     let scored = if play.jokers().iter().any(|joker| joker.kind == Splash) {
@@ -150,13 +154,21 @@ pub fn score_hand(play: &Play) -> f64 {
     };
     for card in scored {
         if let Some(e) = card.enhancement {
-            match e {
-                Bonus => chips += 30.0,
-                Glass => mult *= 2.0,
-                Mult => mult += 4.0,
-                Lucky => mult += 20.0,
-                Stone => chips += 50.0,
-                _ => {}
+            if !play
+                .jokers()
+                .iter()
+                .any(|j| matches!(j.kind, Vampire { .. }))
+            {
+                match e {
+                    Bonus => chips += 30.0,
+                    Glass => mult *= 2.0,
+                    Mult => mult += 4.0,
+                    Lucky => mult += 20.0,
+                    Stone => chips += 50.0,
+                    _ => {}
+                }
+            } else {
+                vamp_mult += 0.1;
             }
         }
         if let Some(e) = card.edition {
@@ -281,20 +293,18 @@ pub fn score_hand(play: &Play) -> f64 {
             mult *= 1.5
         }
         for joker in play.jokers() {
-            match joker.kind{
+            match joker.kind {
                 Baron => {
                     if card.rank == King {
                         mult *= 1.5
                     }
                 }
-                ReservedParking {..} => {
-                    match card.rank {
-                        Jack | Queen | King => todo!(),
-                        _ => {}
-                    }
-                }
+                ReservedParking { .. } => match card.rank {
+                    Jack | Queen | King => todo!(),
+                    _ => {}
+                },
                 RaisedFist => {
-                    if card.rank == hand.iter().min_by_key(|c|c.rank).unwrap().rank {
+                    if card.rank == hand.iter().min_by_key(|c| c.rank).unwrap().rank {
                         mult += get_chips_from_rank(card.rank);
                     }
                 }
@@ -377,7 +387,7 @@ pub fn score_hand(play: &Play) -> f64 {
             SteelJoker { xmult } => mult *= xmult,
             Abstract { mult: jmult } => mult += jmult as f64,
             GrosMichel { .. } => mult += 15.0,
-            Supernova => mult += play.run_info().poker_hands.high_card.played as f64, // TODO: Add proper handling of supernova
+            Supernova => mult += get_supernova_mult(play),
             Blackboard => {
                 if play.hand().iter().filter(|c| !c.selected).all(|c| {
                     c.card.as_ref().unwrap().suit == Spades
@@ -396,12 +406,12 @@ pub fn score_hand(play: &Play) -> f64 {
                     todo!("Implement money gain")
                 }
             }
-            Cavendish {..} => mult *= 3.0,
+            Cavendish { .. } => mult *= 3.0,
             CardSharp => todo!(),
             RedCard { mult: jmult } => mult += jmult as f64,
             Square { chips: jchips } => chips += jchips as f64,
             Madness { xmult } => mult *= xmult,
-            Vampire { xmult } => mult *= xmult,
+            Vampire { xmult } => mult *= xmult + vamp_mult,
             Hologram { xmult } => mult *= xmult,
             Obelisk { xmult } => mult *= xmult,
             Erosion { mult: jmult } => mult += jmult as f64,
@@ -491,6 +501,14 @@ pub fn score_hand(play: &Play) -> f64 {
             Yorick { xmult } => mult *= xmult,
             _ => {}
         }
+        if let Some(e) = joker.edition {
+            match e {
+                JokerEdition::Foil => chips += 50.0,
+                JokerEdition::Holographic => mult += 10.0,
+                JokerEdition::Polychrome => mult *= 1.5,
+                JokerEdition::Negative => {}
+            }
+        }
     }
     if play.run_info().deck == Plasma {
         mult = ((chips + mult) / 2.0).floor();
@@ -515,5 +533,15 @@ fn get_chips_from_rank(rank: Rank) -> f64 {
         Jack => 10.0,
         Queen => 10.0,
         King => 10.0,
+    }
+}
+
+fn get_supernova_mult(play: &Play) -> f64 {
+    match play.poker_hand() {
+        Some(hand) => {
+            let hands = &play.run_info().poker_hands.clone().into_iter();
+            hands.clone().find(|h| h.hand == *hand).unwrap().played as f64
+        }
+        None => panic!(),
     }
 }
