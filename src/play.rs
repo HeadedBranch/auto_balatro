@@ -22,16 +22,16 @@ use remotro::balatro::{
 
 fn get_scored_cards<'a>(
     selected: &mut Vec<&'a PlayingCard>,
-    hand_type: &PokerHandKind,
+    hand_type: PokerHandKind,
     shortcut: bool,
     // TODO: Add support for smeared joker
 ) -> Vec<&'a PlayingCard> {
     const FIVE_CARD_HANDS: [PokerHandKind; 4] = [FiveOfAKind, FlushFive, FlushHouse, FullHouse];
     // Hands that always require 5 cards to exist
     let mut scored: Vec<&'a PlayingCard> = Vec::new();
-    if FIVE_CARD_HANDS.contains(hand_type) {
-        return selected.to_vec();
-    };
+    if FIVE_CARD_HANDS.contains(&hand_type) {
+        return selected.clone();
+    }
     for card in &mut *selected {
         if card.enhancement == Some(Stone) {
             scored.push(card);
@@ -138,7 +138,7 @@ pub fn score_hand(play: &Play) -> f64 {
         }
     }
     if selected.is_empty() {
-        return 0.0;
+        return 0.0
     }
     let mut vamp_mult = 0.0;
     let mut chips = play.poker_hand().unwrap().chips as f64;
@@ -148,17 +148,19 @@ pub fn score_hand(play: &Play) -> f64 {
     } else {
         get_scored_cards(
             &mut selected,
-            &play.poker_hand().unwrap().kind,
+            play.poker_hand().unwrap().kind,
             play.jokers().iter().any(|j| j.kind == FourFingers),
         )
     };
     for card in scored {
         if let Some(e) = card.enhancement {
-            if !play
+            if play
                 .jokers()
                 .iter()
                 .any(|j| matches!(j.kind, Vampire { .. }))
             {
+                vamp_mult += 0.1
+            } else {
                 match e {
                     Bonus => chips += 30.0,
                     Glass => mult *= 2.0,
@@ -167,8 +169,6 @@ pub fn score_hand(play: &Play) -> f64 {
                     Stone => chips += 50.0,
                     _ => {}
                 }
-            } else {
-                vamp_mult += 0.1;
             }
         }
         if let Some(e) = card.edition {
@@ -371,8 +371,7 @@ pub fn score_hand(play: &Play) -> f64 {
                 }
             }
             Stencil { xmult } => mult *= xmult as f64,
-            Ceremonial { mult: jmult } => mult += jmult as f64,
-            Banner => chips += 30.0 * play.discards() as f64,
+            Banner => chips += 30.0 * f64::from(play.discards()),
             MysticSummit => {
                 if play.discards() == 0 {
                     mult += 15.0
@@ -384,8 +383,6 @@ pub fn score_hand(play: &Play) -> f64 {
                 }
             }
             Misprint => mult += 23.0,
-            SteelJoker { xmult } => mult *= xmult,
-            Abstract { mult: jmult } => mult += jmult as f64,
             GrosMichel { .. } => mult += 15.0,
             Supernova => mult += get_supernova_mult(play),
             Blackboard => {
@@ -396,11 +393,6 @@ pub fn score_hand(play: &Play) -> f64 {
                     mult *= 3.0
                 }
             }
-            Runner { chips: jchips } => chips += jchips as f64,
-            IceCream { chips: jchips } => chips += jchips as f64,
-            BlueJoker { chips: jchips } => chips += jchips as f64,
-            Constellation { xmult } => mult *= xmult,
-            GreenJoker { mult: jmult } => mult += jmult as f64,
             TodoList { poker_hand } => {
                 if poker_hand == play.poker_hand().unwrap().kind {
                     todo!("Implement money gain")
@@ -408,33 +400,13 @@ pub fn score_hand(play: &Play) -> f64 {
             }
             Cavendish { .. } => mult *= 3.0,
             CardSharp => todo!(),
-            RedCard { mult: jmult } => mult += jmult as f64,
-            Square { chips: jchips } => chips += jchips as f64,
-            Madness { xmult } => mult *= xmult,
             Vampire { xmult } => mult *= xmult + vamp_mult,
-            Hologram { xmult } => mult *= xmult,
-            Obelisk { xmult } => mult *= xmult,
-            Erosion { mult: jmult } => mult += jmult as f64,
-            FortuneTeller { mult: jmult } => mult += jmult as f64,
-            JokerKind::Stone { chips: jchips } => chips += jchips as f64,
-            Bull => chips += 2.0 * play.money() as f64,
-            Flash { mult: jmult } => mult += jmult as f64,
-            Popcorn { mult: jmult } => mult += jmult as f64,
-            Trousers { mult: jmult } => mult += jmult as f64,
-            Ramen { xmult } => mult *= xmult,
-            Castle {
-                chips: jchips,
-                suit: _,
-            } => chips += jchips as f64,
-            Campfire { xmult } => mult *= xmult,
+            Bull => chips += 2.0 * f64::from(play.money()),
             Acrobat => {
                 if play.hands() == 1 {
                     mult *= 3.0;
                 }
             }
-            Swashbuckler { mult: jmult } => mult += jmult as f64,
-            Throwback { xmult } => mult *= xmult,
-            JokerKind::Glass { xmult } => mult *= xmult,
             FlowerPot => {
                 if [Spades, Clubs, Diamonds, Hearts].iter().all(|suit| {
                     play.hand()
@@ -446,7 +418,6 @@ pub fn score_hand(play: &Play) -> f64 {
                 }
             }
             Blueprint => todo!(),
-            Wee { chips: jchips } => chips += jchips as f64,
             SeeingDouble => {
                 if play
                     .hand()
@@ -464,7 +435,6 @@ pub fn score_hand(play: &Play) -> f64 {
                 }
             }
             Matador => todo!("Add money handling"),
-            HitTheRoad { xmult } => mult *= xmult,
             Duo => {
                 if play.poker_hand().unwrap().kind == Pair {
                     mult *= 2.0
@@ -496,8 +466,38 @@ pub fn score_hand(play: &Play) -> f64 {
                     mult *= 3.0
                 }
             }
+            // +chips jokers
+            Runner { chips: jchips } |
+            IceCream { chips: jchips } |
+            BlueJoker { chips: jchips } |
+            Square { chips: jchips } |
+            JokerKind::Stone { chips: jchips } |
+            Castle { chips: jchips, suit: _, } |
+            Wee { chips: jchips } => chips += jchips as f64,
+            // +mult Jokers:
+            Ceremonial { mult: jmult } |
+            Abstract { mult: jmult } |
+            GreenJoker { mult: jmult } |
+            RedCard { mult: jmult } |
+            Erosion { mult: jmult } |
+            FortuneTeller { mult: jmult } |
+            Flash { mult: jmult } |
+            Popcorn { mult: jmult } |
+            Trousers { mult: jmult } |
+            Swashbuckler { mult: jmult } |
             Bootstraps { mult: jmult } => mult += jmult as f64,
-            Caino { xmult } => mult *= xmult,
+            // xmult jokers:
+            SteelJoker { xmult } |
+            Constellation { xmult } |
+            Madness { xmult } |
+            Hologram { xmult } |
+            Obelisk { xmult } |
+            Ramen { xmult } |
+            Campfire { xmult } |
+            Throwback { xmult } |
+            JokerKind::Glass { xmult } |
+            HitTheRoad { xmult } |
+            Caino { xmult } |
             Yorick { xmult } => mult *= xmult,
             _ => {}
         }
@@ -511,7 +511,7 @@ pub fn score_hand(play: &Play) -> f64 {
         }
     }
     if play.run_info().deck == Plasma {
-        mult = ((chips + mult) / 2.0).floor();
+        mult = f64::midpoint(chips, mult).floor();
         chips = mult
     }
     println!("{:?} {chips} {mult}", play.poker_hand().unwrap().kind);
@@ -529,10 +529,7 @@ fn get_chips_from_rank(rank: Rank) -> f64 {
         Seven => 7.0,
         Eight => 8.0,
         Nine => 9.0,
-        Ten => 10.0,
-        Jack => 10.0,
-        Queen => 10.0,
-        King => 10.0,
+        Ten | Jack | Queen | King => 10.0,
     }
 }
 
