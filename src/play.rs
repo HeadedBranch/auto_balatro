@@ -152,6 +152,7 @@ pub fn score_hand(play: &Play) -> f64 {
             play.jokers().iter().any(|j| j.kind == FourFingers),
         )
     };
+    // Cards that are played
     for card in scored {
         if let Some(e) = card.enhancement {
             if play
@@ -288,6 +289,7 @@ pub fn score_hand(play: &Play) -> f64 {
         }
         chips += get_chips_from_rank(card.rank);
     }
+    // Unplayed cards in hand
     for card in &hand {
         if card.enhancement == Some(Steel) {
             mult *= 1.5
@@ -312,6 +314,7 @@ pub fn score_hand(play: &Play) -> f64 {
             }
         }
     }
+    // Jokers that trigger by themselves
     for joker in play.jokers() {
         match joker.kind {
             Joker => mult += 4.0,
@@ -384,6 +387,7 @@ pub fn score_hand(play: &Play) -> f64 {
             }
             Misprint => mult += 23.0,
             GrosMichel { .. } => mult += 15.0,
+            Cavendish { .. } => mult *= 3.0,
             Supernova => mult += get_supernova_mult(play),
             Blackboard => {
                 if play.hand().iter().filter(|c| !c.selected).all(|c| {
@@ -398,8 +402,11 @@ pub fn score_hand(play: &Play) -> f64 {
                     todo!("Implement money gain")
                 }
             }
-            Cavendish { .. } => mult *= 3.0,
-            CardSharp => todo!(),
+            CardSharp => {
+                if get_card_sharp_state(play) {
+                    mult *= 3.0
+                }
+            }
             Vampire { xmult } => mult *= xmult + vamp_mult,
             Bull => chips += 2.0 * f64::from(play.money()),
             Acrobat => {
@@ -539,6 +546,17 @@ fn get_supernova_mult(play: &Play) -> f64 {
             let hands = &play.run_info().poker_hands.clone().into_iter();
             hands.clone().find(|h| h.hand == *hand).unwrap().played as f64
         }
-        None => panic!(),
+        None => 0.0,
     }
 }
+
+fn get_card_sharp_state(play: &Play) -> bool {
+    match play.poker_hand() {
+        Some(hand) => {
+            let hands = &play.run_info().poker_hands.clone().into_iter();
+            hands.clone().find(|h| h.hand == *hand).unwrap().played_round >= 1
+        }
+        None => false,
+    }
+}
+
