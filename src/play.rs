@@ -140,7 +140,6 @@ pub fn score_hand(play: &Play) -> f64 {
     if selected.is_empty() {
         return 0.0
     }
-    let mut vamp_mult = 0.0;
     let mut chips = play.poker_hand().unwrap().chips as f64;
     let mut mult = play.poker_hand().unwrap().mult as f64;
     let scored = if play.jokers().iter().any(|joker| joker.kind == Splash) {
@@ -153,15 +152,13 @@ pub fn score_hand(play: &Play) -> f64 {
         )
     };
     // Cards that are played
-    for card in scored {
-        if let Some(e) = card.enhancement {
-            if play
+    for card in &scored {
+        if let Some(e) = card.enhancement
+            && !play
                 .jokers()
                 .iter()
                 .any(|j| matches!(j.kind, Vampire { .. }))
             {
-                vamp_mult += 0.1
-            } else {
                 match e {
                     Bonus => chips += 30.0,
                     Glass => mult *= 2.0,
@@ -171,7 +168,6 @@ pub fn score_hand(play: &Play) -> f64 {
                     _ => {}
                 }
             }
-        }
         if let Some(e) = card.edition {
             match e {
                 Foil => chips += 50.0,
@@ -407,7 +403,7 @@ pub fn score_hand(play: &Play) -> f64 {
                     mult *= 3.0
                 }
             }
-            Vampire { xmult } => mult *= xmult + vamp_mult,
+            Vampire { xmult } => mult *= xmult + 0.1 * scored.iter().filter(|c| c.enhancement.is_some()).count() as f64,
             Bull => chips += 2.0 * f64::from(play.money()),
             Acrobat => {
                 if play.hands() == 1 {

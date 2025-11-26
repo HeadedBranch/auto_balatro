@@ -1,4 +1,5 @@
-use remotro::{Remotro, balatro::CurrentScreen};
+use remotro::{Remotro, balatro::CurrentScreen::*};
+use remotro::balatro::menu::{Deck, Stake};
 
 mod play;
 
@@ -22,17 +23,26 @@ async fn main() {
         loop {
             match balatro.screen().await {
                 Ok(screen) => match screen {
-                    CurrentScreen::Menu(_menu) => {}
-                    CurrentScreen::SelectBlind(_blinds) => {}
-                    CurrentScreen::Play(/*mut*/ play) => {
+                    Menu(menu) => {
+                        let _ = menu.new_run(Deck::Black, Stake::White, None).await;
+                    }
+                    SelectBlind(blinds) => {
+                        blinds.select().await.expect("message");
+                    }
+                    Play(/*mut*/ play) => {
                         println!("Playing");
                         //play = play.click(&[0]).await.expect("Something Failed");
                         println!("{}", play::score_hand(&play));
                         //let _ = play.play().await;
                     }
-                    CurrentScreen::Shop(_shop) => {}
-                    CurrentScreen::GameOver(_game) => {
-                        println!("Game Over");
+                    Shop(_shop) => {}
+                    GameOver(game) => {
+                        println!("{:?}",game.outcome());
+                        println!("{:?}",game.best_hand());
+                        println!("{:?}",game.most_played_hand());
+                        println!("{:?}",game.cards_discarded());
+                        println!("{:?}",game.cards_played());
+                        println!("{:?}",game.times_rerolled());
                     }
                     _ => {}
                 },
