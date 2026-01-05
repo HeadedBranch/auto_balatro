@@ -217,7 +217,7 @@ pub fn score_hand(play: &Play) -> f64 {
                     _ => {}
                 },
                 OddTodd => match card.rank {
-                    Ace | Two | Three | Five | Seven | Nine => chips += 31.0,
+                    Ace | Three | Five | Seven | Nine => chips += 31.0,
                     _ => {}
                 },
                 Scholar => {
@@ -555,4 +555,3 @@ fn get_card_sharp_state(play: &Play) -> bool {
         None => false,
     }
 }
-
